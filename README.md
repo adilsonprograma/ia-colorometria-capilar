@@ -372,3 +372,5 @@ Se quiser alterar comportamento da interface:
 ## Licenca e uso
 
 Se este projeto for usado em ambiente profissional, o ideal e manter um aviso claro de que as respostas sao sugestoes tecnicas e devem ser conferidas por um colorista antes da aplicacao real.
+# ia-colorometria-capilar
+# ia-colorometria-capilar
