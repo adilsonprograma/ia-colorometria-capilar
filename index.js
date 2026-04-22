@@ -12,6 +12,45 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.protocol === 'file:' ? defaultServerOrigin : window.location.origin;
     const fallbackPrompt =
         'Ola! Sou a ColorIA. Vamos montar um protocolo tecnico de colorimetria. Primeiro, me diga qual e a cor atual ou base do cabelo.';
+    const formulaReferencePartGrams ='a proporção indicada pelo fabricante ex: um para um ou um para um e meio';
+    const fantasyToneGuidance = { };
+    const baseColorToneLevels = {
+        preto: '1',
+        castanho: '5',
+        loiro: '8',
+        ruivo: '7',
+        grisalho: '10'
+    };
+    const naturalToneLabels = {
+        '1': 'preto',
+        '2': 'castanho muito escuro',
+        '3': 'castanho escuro',
+        '4': 'castanho medio',
+        '5': 'castanho claro',
+        '6': 'loiro escuro',
+        '7': 'loiro medio',
+        '8': 'loiro claro',
+        '9': 'loiro muito claro',
+        '10': 'loiro clarissimo'
+    };
+    const fantasyToneLabels = {
+        '0.11': 'acinzentado intenso',
+        '0.1': 'acinzentado',
+        '0.2': 'irisado ou perolado',
+        '0.3': 'dourado',
+        '0.4': 'cobre',
+        '0.5': 'acaju ou marsala',
+        '0.6': 'vermelho'
+    };
+    const fantasyToneGuidance = {
+        '0.11': 'Reflexo frio intenso, util para segurar amarelo e ajudar no controle do calor residual.',
+        '0.1': 'Reflexo acinzentado para esfriar fundos alaranjados e deixar a leitura mais neutra.',
+        '0.2': 'Reflexo irisado ou perolado, bom para amarelos mais claros e acabamento mais suave.',
+        '0.3': 'Reflexo dourado para aquecer, devolver luminosidade e manter o fundo mais solar.',
+        '0.4': 'Reflexo cobre para reforcar calor e construir ruivos ou acobreados.',
+        '0.5': 'Reflexo acaju ou marsala, com leitura vermelho-violeta mais profunda.',
+        '0.6': 'Reflexo vermelho para intensificar calor, profundidade e saturacao.'
+    };
 
     let initialPrompt = fallbackPrompt;
     let context = createInitialContext();
@@ -136,6 +175,139 @@ document.addEventListener('DOMContentLoaded', () => {
         return descriptions[waterTest] || waterTest;
     }
 
+    function getBaseTone(baseColor) {
+        return baseColorToneLevels[baseColor] || '6';
+    }
+
+    function describeOxidantAction(oxidantVolume) {
+        const actions = {
+            10: 'Apenas deposita cor sem grande elevacao de fundo.',
+            20: 'Clareia 1 a 2 tons e ajuda na cobertura de brancos.',
+            30: 'Clareia 2 a 3 tons.',
+            40: 'Clareia ate 4 tons.'
+        };
+
+        return actions[oxidantVolume] || 'A volumagem precisa ser confirmada pela marca.';
+    }
+
+    function estimateOxidantVolume(baseTone, naturalTone, targetColor) {
+        const normalizedTarget = normalizeText(targetColor);
+
+        if (['branco', 'brancos', 'cobrir'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return 20;
+        }
+
+        const lift = Math.max(Number.parseInt(naturalTone, 10) - Number.parseInt(baseTone, 10), 0);
+
+        if (lift === 0) {
+            return 10;
+        }
+
+        if (lift <= 2) {
+            return 20;
+        }
+
+        if (lift <= 3) {
+            return 30;
+        }
+
+        return 40;
+    }
+
+    function combineFormulaResult(naturalTone, fantasyTone) {
+        return `${naturalTone}${fantasyTone.slice(1)}`;
+    }
+
+    function createFormulaProfile(baseTone, naturalTone, fantasyTone, targetColor) {
+        const oxidantVolume = estimateOxidantVolume(baseTone, naturalTone, targetColor);
+
+        return {
+            baseTone,
+            naturalTone,
+            naturalLabel: naturalToneLabels[naturalTone] || `tom ${naturalTone}`,
+            fantasyTone,
+            fantasyLabel: fantasyToneLabels[fantasyTone] || 'reflexo personalizado',
+            approximateResult: combineFormulaResult(naturalTone, fantasyTone),
+            oxidantVolume,
+            oxidantAction: describeOxidantAction(oxidantVolume),
+            mixRule11Amount: Math.max(0, 11 - Number.parseInt(naturalTone, 10))
+        };
+    }
+
+    function detectRequestedFormulaCode(text) {
+        const normalized = normalizeText(text);
+        const match = normalized.match(/\b(10|[1-9])[.,](11|1|2|3|4|5|6)\b/);
+
+        if (!match) {
+            return null;
+        }
+
+        const naturalTone = match[1];
+        const fantasySuffix = match[2];
+        const fantasyTone = fantasySuffix === '11' ? '0.11' : `0.${fantasySuffix}`;
+        return { naturalTone, fantasyTone };
+    }
+
+    function buildFormulaProfile(targetColor, baseColor) {
+        const baseTone = getBaseTone(baseColor);
+        const explicitCode = detectRequestedFormulaCode(targetColor);
+
+        if (explicitCode) {
+            return createFormulaProfile(
+                baseTone,
+                explicitCode.naturalTone,
+                explicitCode.fantasyTone,
+                targetColor
+            );
+        }
+
+        const normalizedTarget = normalizeText(targetColor);
+        const defaultNaturalTone = baseTone;
+
+        if (['platin', 'acinzent', 'gelo'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return createFormulaProfile(baseTone, '10', '0.11', targetColor);
+        }
+
+        if (['perol', 'irisad'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return createFormulaProfile(baseTone, '10', '0.2', targetColor);
+        }
+
+        if (['matiz', 'matizacao', 'tonaliz'].some((keyword) => normalizedTarget.includes(keyword))) {
+            const naturalTone = ['loiro', 'grisalho'].includes(baseColor) ? '9' : defaultNaturalTone;
+            return createFormulaProfile(baseTone, naturalTone, '0.11', targetColor);
+        }
+
+        if (normalizedTarget.includes('dourad')) {
+            return createFormulaProfile(baseTone, '9', '0.3', targetColor);
+        }
+
+        if (['ruivo', 'cobre', 'acobreado', 'ginger'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return createFormulaProfile(baseTone, '7', '0.4', targetColor);
+        }
+
+        if (['marsala', 'vinho', 'ameixa', 'acaju'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return createFormulaProfile(baseTone, '5', '0.5', targetColor);
+        }
+
+        if (normalizedTarget.includes('vermelho')) {
+            return createFormulaProfile(baseTone, '6', '0.6', targetColor);
+        }
+
+        if (['branco', 'brancos', 'cobrir'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return createFormulaProfile(baseTone, defaultNaturalTone, '0.1', targetColor);
+        }
+
+        if (['castanho', 'chocolate', 'frio', 'marrom'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return createFormulaProfile(baseTone, '5', '0.1', targetColor);
+        }
+
+        if (normalizedTarget.includes('loiro')) {
+            return createFormulaProfile(baseTone, '10', '0.11', targetColor);
+        }
+
+        return createFormulaProfile(baseTone, defaultNaturalTone, '0.3', targetColor);
+    }
+
     function getGoalProfile(targetColor, baseColor) {
         const normalizedTarget = normalizeText(targetColor);
 
@@ -175,9 +347,9 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        if (['marsala', 'vinho', 'ameixa', 'vermelho'].some((keyword) => normalizedTarget.includes(keyword))) {
+        if (['marsala', 'vinho', 'ameixa', 'acaju'].some((keyword) => normalizedTarget.includes(keyword))) {
             return {
-                label: 'vermelho profundo ou marsala',
+                label: 'marsala ou acaju profundo',
                 expectedBackground: 'vermelho com apoio de cobre ou violeta',
                 oswaldGuidance:
                     'Na Estrela de Oswald, verde neutraliza vermelho. Use verde apenas para segurar excesso de vermelho. Para manter marsala, preserve reflexos vermelho-violeta sem neutralizar demais.',
@@ -188,6 +360,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 bleachingTarget: 'fundo limpo sem laranja sujo antes da coloracao',
                 caution:
                     'Em bases muito escuras, o marsala costuma aparecer melhor depois de uma abertura previa controlada.'
+            };
+        }
+
+        if (normalizedTarget.includes('vermelho')) {
+            return {
+                label: 'vermelho intenso',
+                expectedBackground: 'vermelho aberto com apoio de cobre',
+                oswaldGuidance:
+                    'Na Estrela de Oswald, verde neutraliza vermelho. Use verde apenas para segurar excesso de calor quando o objetivo nao for um vermelho muito vivo.',
+                naturalReference: 'base natural no mesmo nivel para sustentar intensidade',
+                fantasyReference: 'nuance vermelha para reforcar saturacao e profundidade',
+                oxHint:
+                    '20 volumes para depositar e 30 volumes quando precisar abrir levemente a base.',
+                bleachingTarget: 'fundo limpo e uniforme, sem manchas quentes excessivas',
+                caution:
+                    'Vermelhos intensos costumam desbotar mais rapido e pedem manutencao de pigmento com mais frequencia.'
             };
         }
 
@@ -325,21 +513,64 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
     }
 
-    function buildFormulaSection(profile) {
+    function buildNumberingSection(formulaProfile) {
         return [
-            `Base natural: ${profile.naturalReference}.`,
-            `Cor fantasia ou reflexo: ${profile.fantasyReference}.`,
-            'Calculo pela regra solicitada: 30 g de cor natural + 30 g de cor fantasia = 60 g de coloracao.',
-            'OX = metade do total da coloracao. Entao: 60 / 2 = 30 g de oxidante.',
-            `Oxidante sugerido: ${profile.oxHint}`
+            'Numero antes do ponto: altura de tom da cor, na escala natural de 1 a 10.',
+            `Altura de tom sugerida: ${formulaProfile.naturalTone} (${formulaProfile.naturalLabel}).`,
+            'Numero apos o ponto: reflexo ou nuance secundaria da formula.',
+            `Reflexo sugerido: ${formulaProfile.fantasyTone} (${formulaProfile.fantasyLabel}).`,
+            `Leitura final do codigo aproximado: ${formulaProfile.approximateResult}.`
+        ];
+    }
+
+    function buildChemistrySection(profile, formulaProfile) {
+        const naturalGrams = formulaReferencePartGrams;
+        const fantasyGrams = formulaReferencePartGrams;
+        const resultGrams = naturalGrams + fantasyGrams;
+        const oxidantGrams = resultGrams / 2;
+
+        return [
+            'Creme colorante alcalino: a amonia ou agente similar abre a cuticula para a entrada dos precursores de cor.',
+            `Formula em gramas: ${naturalGrams} g do tom natural ${formulaProfile.naturalTone} + ${fantasyGrams} g da nuance ${formulaProfile.fantasyTone} = ${resultGrams} g de coloracao.`,
+            `OX pela leitura da elevacao: ${formulaProfile.oxidantVolume} volumes. ${formulaProfile.oxidantAction}`,
+            `Pela regra do projeto, OX = metade do total da coloracao: ${resultGrams} / 2 = ${oxidantGrams} g de oxidante.`,
+            `Leitura tecnica complementar: ${profile.oxHint}`
+        ];
+    }
+
+    function buildColorimetrySection(profile, formulaProfile) {
+        return [
+            `Formula da cor: ${formulaProfile.naturalTone} + ${formulaProfile.fantasyTone} = ${formulaProfile.approximateResult}.`,
+            `Cor desejada aproximada: ${formulaProfile.approximateResult}.`,
+            `Fundo esperado: ${profile.expectedBackground}.`,
+            `Neutralizacao ou preservacao: ${profile.oswaldGuidance}`,
+            `Leitura do reflexo ${formulaProfile.fantasyTone}: ${fantasyToneGuidance[formulaProfile.fantasyTone] || 'Use a nuance para aquecer ou esfriar conforme o fundo.'}`,
+            'Mistura de tons: quando dois tons com o mesmo reflexo sao usados, o resultado pode caminhar para um intermediario. Ex.: 7.1 + 9.1 = 8.1.',
+            `Regra do 11 para mix ou matizador: 11 - ${formulaProfile.naturalTone} = ${formulaProfile.mixRule11Amount}. Isso indica ate ${formulaProfile.mixRule11Amount} cm de corretor quando houver necessidade tecnica de neutralizacao.`
+        ];
+    }
+
+    function buildMechanismSection(formulaProfile) {
+        return [
+            'Abertura: o alcalinizante eleva o pH e abre as cuticulas.',
+            `Oxidacao ou clareamento: a OX de ${formulaProfile.oxidantVolume} volumes libera oxigenio e atua no cortex.`,
+            'Deposito: os pigmentos artificiais entram no cortex e se oxidam para formar a nova cor.',
+            'Selagem: apos enxague e tratamento de pH mais baixo, a fibra tende a reter melhor a cor.'
         ];
     }
 
     function buildProtocolResponse(currentContext) {
         const profile = getGoalProfile(currentContext.targetColor, currentContext.baseColor);
+        const formulaProfile = buildFormulaProfile(
+            currentContext.targetColor,
+            currentContext.baseColor
+        );
         const techniqueSteps = buildTechniqueSteps(currentContext.technique, profile);
         const waterPlan = buildWaterPlan(currentContext.waterTest);
-        const formulaLines = buildFormulaSection(profile);
+        const numberingLines = buildNumberingSection(formulaProfile);
+        const chemistryLines = buildChemistrySection(profile, formulaProfile);
+        const colorimetryLines = buildColorimetrySection(profile, formulaProfile);
+        const mechanismLines = buildMechanismSection(formulaProfile);
         const lines = [
             'Protocolo tecnico sugerido',
             '',
@@ -357,13 +588,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         lines.push('');
-        lines.push('Leitura pela Estrela de Oswald');
-        lines.push(`- Fundo esperado: ${profile.expectedBackground}`);
-        lines.push(`- Neutralizacao ou preservacao: ${profile.oswaldGuidance}`);
+        lines.push('Leitura da numeracao');
+        numberingLines.forEach((line) => {
+            lines.push(`- ${line}`);
+        });
         lines.push('');
-        lines.push('Calculo da formula');
-
-        formulaLines.forEach((line) => {
+        lines.push('Quimica da formula');
+        chemistryLines.forEach((line) => {
+            lines.push(`- ${line}`);
+        });
+        lines.push('');
+        lines.push('Leitura pela Estrela de Oswald');
+        colorimetryLines.forEach((line) => {
+            lines.push(`- ${line}`);
+        });
+        lines.push('');
+        lines.push('Mecanismo de acao');
+        mechanismLines.forEach((line) => {
             lines.push(`- ${line}`);
         });
 

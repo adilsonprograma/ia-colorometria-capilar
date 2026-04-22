@@ -78,7 +78,6 @@ body {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow);
     overflow: hidden;
-    backdrop-filter: blur(10px);
 }
 
 .app-header {

@@ -7,7 +7,7 @@ ColorIA e um assistente local para apoio em colorimetria capilar. O projeto roda
 - tecnica escolhida pelo profissional
 - orientacao pela Estrela de Oswald
 - sugestao de descoloracao ou deposito de cor
-- calculo de formula no formato `cor natural + cor fantasia + OX / 2`
+- calculo de formula com base natural, cor fantasia e oxidante conforme a regra do projeto
 - orientacao de hidratacao com base no teste da agua
 
 ## Objetivo do projeto
@@ -87,23 +87,31 @@ Resultado esperado:
 - protocolo de descoloracao global
 - observacao de subida de fundo para loiro
 - neutralizacao por violeta ou azul/violeta segundo a Estrela de Oswald
-- formula com base natural, nuance fria e calculo de OX
+- formula com tom natural, nuance fantasia e resultado aproximado da cor
 - cronograma para alta porosidade
 
 ## Formula usada no protocolo
 
 O app segue a regra solicitada no projeto:
 
+O app combina:
+
+- tom natural de `1` a `10`
+- cor fantasia de `0.11` a `0.6`
+- oxidante em metade do total da coloracao
+- leitura de numeracao, quimica da formula, colorimetria e mecanismo de acao
+
 ```text
-cor natural + cor fantasia = total de coloracao
+tom natural + cor fantasia = cor desejada aproximada
 OX = metade do total da coloracao
 ```
 
 Exemplo pratico:
 
 ```text
-30 g de cor natural + 30 g de cor fantasia = 60 g de coloracao
-60 / 2 = 30 g de OX
+10 + 0.11 = 10.11
+30 g do tom natural 10 + 30 g da nuance 0.11 = 60 g de coloracao
+60 / 2 = 30 g de oxidante
 ```
 
 Importante:
@@ -111,6 +119,15 @@ Importante:
 - esse calculo e uma regra de referencia usada no projeto
 - a proporcao final sempre deve ser validada com a marca e a linha profissional utilizada
 - cada fabricante pode exigir proporcao, volumagem e pausa diferentes
+
+O protocolo final agora explica:
+
+- numero antes do ponto como altura de tom
+- numero apos o ponto como reflexo ou nuance
+- escolha da OX por elevacao aproximada de tons
+- neutralizacao pela Estrela de Oswald
+- regra do 11 para mix ou matizador
+- abertura, oxidacao, deposito e selagem da cor
 
 ## Tecnicas reconhecidas
 

@@ -2,6 +2,8 @@ import unittest
 
 from chat_logic import (
     ConversationState,
+    build_formula_profile,
+    build_protocol_response,
     detect_base_color,
     detect_technique,
     detect_water_test,
@@ -42,6 +44,37 @@ class ChatLogicTests(unittest.TestCase):
         self.assertEqual(result.state.target_color, "Loiro platinado")
         self.assertIn("qual tecnica", result.response.lower())
 
+    def test_build_formula_profile_supports_numeric_color_code(self) -> None:
+        formula_profile = build_formula_profile("Quero chegar no 7.4", "castanho")
+
+        self.assertEqual(formula_profile.base_tone, "5")
+        self.assertEqual(formula_profile.natural_tone, "7")
+        self.assertEqual(formula_profile.fantasy_tone, "0.4")
+        self.assertEqual(formula_profile.approximate_result, "7.4")
+        self.assertEqual(formula_profile.oxidant_volume, 20)
+
+    def test_build_formula_profile_maps_acaju_to_marsala_reflection(self) -> None:
+        formula_profile = build_formula_profile("Quero um acaju profundo", "castanho")
+
+        self.assertEqual(formula_profile.natural_tone, "5")
+        self.assertEqual(formula_profile.fantasy_tone, "0.5")
+        self.assertEqual(formula_profile.approximate_result, "5.5")
+
+    def test_protocol_for_acaju_uses_marsala_family_guidance(self) -> None:
+        response = build_protocol_response(
+            ConversationState(
+                step=4,
+                base_color="castanho",
+                target_color="acaju",
+                technique="coloracao sem descolorir",
+                water_test="meio",
+            )
+        )
+
+        self.assertIn("Reflexo sugerido: 0.5 (acaju ou marsala).", response)
+        self.assertIn("Cor desejada aproximada: 5.5.", response)
+        self.assertIn("Para manter marsala, preserve reflexos vermelho-violeta sem neutralizar demais.", response)
+
     def test_full_protocol_includes_oswald_formula_and_water_plan(self) -> None:
         result = process_input(
             "afunda",
@@ -55,8 +88,45 @@ class ChatLogicTests(unittest.TestCase):
 
         self.assertEqual(result.state.step, 4)
         self.assertEqual(result.state.water_test, "afunda")
+        self.assertIn("Leitura da numeracao", result.response)
+        self.assertIn("Quimica da formula", result.response)
         self.assertIn("Estrela de Oswald", result.response)
-        self.assertIn("30 g de cor natural + 30 g de cor fantasia", result.response)
+        self.assertIn(
+            "Altura de tom sugerida: 10 (loiro clarissimo).",
+            result.response,
+        )
+        self.assertIn(
+            "Reflexo sugerido: 0.11 (acinzentado intenso).",
+            result.response,
+        )
+        self.assertIn(
+            "Cor desejada aproximada: 10.11.",
+            result.response,
+        )
+        self.assertIn(
+            "Formula em gramas: 30 g do tom natural 10 + 30 g da nuance 0.11 = 60 g de coloracao.",
+            result.response,
+        )
+        self.assertIn(
+            "OX pela leitura da elevacao: 40 volumes. Clareia ate 4 tons.",
+            result.response,
+        )
+        self.assertIn(
+            "Pela regra do projeto, OX = metade do total da coloracao: 60 / 2 = 30 g de oxidante.",
+            result.response,
+        )
+        self.assertIn(
+            "Regra do 11 para mix ou matizador: 11 - 10 = 1.",
+            result.response,
+        )
+        self.assertIn(
+            "Mecanismo de acao",
+            result.response,
+        )
+        self.assertIn(
+            "Abertura: o alcalinizante eleva o pH e abre as cuticulas.",
+            result.response,
+        )
         self.assertIn("alta porosidade", result.response)
         self.assertIn("descoloracao global", result.response)
 
