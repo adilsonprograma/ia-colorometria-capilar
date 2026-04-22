@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fallbackPrompt =
         'Ola! Sou a ColorIA. Vamos montar um protocolo tecnico de colorimetria. Primeiro, me diga qual e a cor atual ou base do cabelo.';
     const formulaReferencePartGrams ='a proporção indicada pelo fabricante ex: um para um ou um para um e meio';
-    const fantasyToneGuidance = { };
+    const fantasyToneGuidance = { ;
     const baseColorToneLevels = {
         preto: '1',
         castanho: '5',
