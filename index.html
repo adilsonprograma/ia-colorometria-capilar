@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ColorIA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="page-shell">
+        <div class="background-glow background-glow-left"></div>
+        <div class="background-glow background-glow-right"></div>
+
+        <section class="app-card" aria-label="Chat ColorIA">
+            <header class="app-header">
+                <div class="brand">
+                    <div class="brand-mark">CI</div>
+                    <div class="brand-copy">
+                        <h1>ColorIA</h1>
+                        <p>Assistente local de colorimetria capilar</p>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <span id="statusBadge" class="status-badge status-connecting">Conectando</span>
+                    <button id="retryBtn" class="secondary-btn" type="button">Reconectar</button>
+                    <button id="restartBtn" class="secondary-btn" type="button">Reiniciar</button>
+                </div>
+            </header>
+
+            <section id="noticeBox" class="notice hidden" aria-live="polite"></section>
+
+            <main id="chatWindow" class="chat-window" aria-live="polite" aria-label="Mensagens">
+                <div class="message bot-message">Iniciando o assistente...</div>
+            </main>
+
+            <footer class="composer">
+                <label class="sr-only" for="userInput">Digite sua mensagem</label>
+                <input
+                    id="userInput"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Ex.: meu cabelo esta castanho escuro"
+                >
+                <button id="sendBtn" class="primary-btn" type="button">Enviar</button>
+            </footer>
+        </section>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>

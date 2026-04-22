@@ -1,0 +1,758 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const chatWindow = document.getElementById('chatWindow');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const retryBtn = document.getElementById('retryBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const noticeBox = document.getElementById('noticeBox');
+    const statusBadge = document.getElementById('statusBadge');
+
+    const defaultServerOrigin = 'http://127.0.0.1:8000';
+    const apiOrigin =
+        window.location.protocol === 'file:' ? defaultServerOrigin : window.location.origin;
+    const fallbackPrompt =
+        'Ola! Sou a ColorIA. Vamos montar um protocolo tecnico de colorimetria. Primeiro, me diga qual e a cor atual ou base do cabelo.';
+
+    let initialPrompt = fallbackPrompt;
+    let context = createInitialContext();
+    let isRequestInFlight = false;
+    let isServerOnline = false;
+    let interactionMode = 'connecting';
+
+    function createInitialContext() {
+        return {
+            step: 0,
+            baseColor: '',
+            targetColor: '',
+            technique: '',
+            waterTest: ''
+        };
+    }
+
+    function buildApiUrl(path) {
+        return `${apiOrigin}${path}`;
+    }
+
+    function normalizeText(text) {
+        return text
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
+    function detectBaseColor(text) {
+        const normalized = normalizeText(text);
+        const keywords = {
+            preto: 'preto',
+            negro: 'preto',
+            castanho: 'castanho',
+            moreno: 'castanho',
+            marrom: 'castanho',
+            loiro: 'loiro',
+            loira: 'loiro',
+            ruivo: 'ruivo',
+            ruiva: 'ruivo',
+            grisalho: 'grisalho',
+            canoso: 'grisalho',
+            branco: 'grisalho'
+        };
+
+        for (const [keyword, canonical] of Object.entries(keywords)) {
+            if (normalized.includes(keyword)) {
+                return canonical;
+            }
+        }
+
+        if (/\b(escuro|claro|medio)\b/.test(normalized)) {
+            if (['castanho', 'moreno', 'marrom'].some((keyword) => normalized.includes(keyword))) {
+                return 'castanho';
+            }
+
+            if (normalized.includes('loiro')) {
+                return 'loiro';
+            }
+        }
+
+        return null;
+    }
+
+    function detectTechnique(text) {
+        const normalized = normalizeText(text);
+        const techniques = {
+            'descoloracao global': [
+                'descoloracao global',
+                'global',
+                'clareamento total',
+                'platinado completo'
+            ],
+            mechas: ['mechas', 'luzes', 'papel', 'touca'],
+            balayage: ['balayage', 'moren iluminada', 'free hand', 'mao livre'],
+            'correcao de cor': ['correcao de cor', 'correcao', 'decapagem', 'limpeza de cor'],
+            'retoque de raiz': ['retoque de raiz', 'retoque', 'raiz'],
+            'coloracao sem descolorir': [
+                'sem descolorir',
+                'tonalizacao',
+                'tonalizar',
+                'matizacao',
+                'banho de brilho',
+                'coloracao'
+            ]
+        };
+
+        for (const [technique, keywords] of Object.entries(techniques)) {
+            if (keywords.some((keyword) => normalized.includes(keyword))) {
+                return technique;
+            }
+        }
+
+        return null;
+    }
+
+    function detectWaterTest(text) {
+        const normalized = normalizeText(text);
+        const waterTests = {
+            boia: ['boia', 'flutua', 'fica em cima', 'superficie'],
+            meio: ['meio', 'metade', 'centro', 'no meio'],
+            afunda: ['afunda', 'fundo', 'desce', 'afundou']
+        };
+
+        for (const [waterTest, keywords] of Object.entries(waterTests)) {
+            if (keywords.some((keyword) => normalized.includes(keyword))) {
+                return waterTest;
+            }
+        }
+
+        return null;
+    }
+
+    function describeWaterTest(waterTest) {
+        const descriptions = {
+            boia: 'boia (baixa porosidade)',
+            meio: 'meio (porosidade equilibrada)',
+            afunda: 'afunda (alta porosidade)'
+        };
+
+        return descriptions[waterTest] || waterTest;
+    }
+
+    function getGoalProfile(targetColor, baseColor) {
+        const normalizedTarget = normalizeText(targetColor);
+
+        if (
+            ['platin', 'acinzent', 'perol', 'gelo', 'loiro'].some((keyword) =>
+                normalizedTarget.includes(keyword)
+            )
+        ) {
+            return {
+                label: 'loiro frio ou platinado',
+                expectedBackground: 'amarelo claro a amarelo palha',
+                oswaldGuidance:
+                    'Pela Estrela de Oswald, amarelo neutraliza com violeta e laranja com azul. Se o fundo abrir muito dourado, use violeta. Se abrir amarelo-alaranjado, use azul com violeta.',
+                naturalReference: 'base natural no nivel de altura de tom alcancado',
+                fantasyReference: 'nuance fria, como acinzentada, irisada ou violeta',
+                oxHint:
+                    '10 a 20 volumes para tonalizacao. No clareamento, 20 ou 30 volumes conforme resistencia do fio.',
+                bleachingTarget: 'amarelo claro uniforme antes da matizacao',
+                caution:
+                    'Se houver coloracao artificial escura, pode ser necessario corrigir ou decapar antes, porque tinta nao clareia tinta.'
+            };
+        }
+
+        if (['ruivo', 'cobre', 'acobreado', 'ginger'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return {
+                label: 'ruivo cobre',
+                expectedBackground: 'laranja dourado',
+                oswaldGuidance:
+                    'Na Estrela de Oswald, azul neutraliza laranja. Para um cobre bonito, nao anule totalmente o laranja; use azul apenas se o fundo abrir quente demais ou manchado.',
+                naturalReference: 'base natural no mesmo nivel do ruivo desejado',
+                fantasyReference: 'nuance cobre ou cobre dourado',
+                oxHint:
+                    '20 volumes na maioria dos depositos e 30 volumes quando precisar abrir mais a base.',
+                bleachingTarget: 'amarelo alaranjado limpo, sem manchas',
+                caution:
+                    'Ruivos desbotam rapido. Vale reforcar pigmento no tonalizante final e manter temperatura de agua mais fria na manutencao.'
+            };
+        }
+
+        if (['marsala', 'vinho', 'ameixa', 'vermelho'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return {
+                label: 'vermelho profundo ou marsala',
+                expectedBackground: 'vermelho com apoio de cobre ou violeta',
+                oswaldGuidance:
+                    'Na Estrela de Oswald, verde neutraliza vermelho. Use verde apenas para segurar excesso de vermelho. Para manter marsala, preserve reflexos vermelho-violeta sem neutralizar demais.',
+                naturalReference: 'base natural do mesmo nivel para sustentacao do fundo',
+                fantasyReference: 'nuance vermelho, violeta ou vermelho-violeta',
+                oxHint:
+                    '20 volumes para depositar cor e 30 volumes se precisar abrir levemente a base antes.',
+                bleachingTarget: 'fundo limpo sem laranja sujo antes da coloracao',
+                caution:
+                    'Em bases muito escuras, o marsala costuma aparecer melhor depois de uma abertura previa controlada.'
+            };
+        }
+
+        if (['branco', 'brancos', 'cobrir'].some((keyword) => normalizedTarget.includes(keyword))) {
+            return {
+                label: 'cobertura de brancos',
+                expectedBackground: 'deposito uniforme sem necessidade de descoloracao',
+                oswaldGuidance:
+                    'A leitura pela Estrela de Oswald entra mais na neutralizacao final. Em cobertura de brancos, o principal e usar base natural para ancoragem da cor.',
+                naturalReference: 'base natural da mesma altura do tom desejado',
+                fantasyReference: 'nuance desejada em apoio, sem retirar a base natural da formula',
+                oxHint: '20 volumes para cobertura mais consistente de brancos.',
+                bleachingTarget: 'nao se aplica, salvo correcao previa',
+                caution:
+                    'Para alta porcentagem de brancos, mantenha a base natural sempre presente na formula para evitar transparencia.'
+            };
+        }
+
+        if (
+            ['castanho', 'chocolate', 'escurecer', 'frio', 'marrom'].some((keyword) =>
+                normalizedTarget.includes(keyword)
+            )
+        ) {
+            return {
+                label: 'castanho de profundidade fria ou neutra',
+                expectedBackground: 'laranja ou vermelho, dependendo da base',
+                oswaldGuidance:
+                    'Na Estrela de Oswald, azul neutraliza laranja e verde neutraliza vermelho. Para fechar em castanho frio, controle o calor com reflexos frios sem anular demais a profundidade.',
+                naturalReference: 'base natural na altura final desejada',
+                fantasyReference: 'nuance fria, como acinzentada ou mate, em apoio ao castanho',
+                oxHint: '10 a 20 volumes para deposito e escurecimento seguro.',
+                bleachingTarget: 'na maioria dos casos nao precisa abrir; apenas equalizar fundo',
+                caution:
+                    'Se o cabelo estiver muito claro e poroso, faca pre-pigmentacao antes do escurecimento para evitar manchas.'
+            };
+        }
+
+        return {
+            label: `resultado personalizado saindo de ${baseColor}`,
+            expectedBackground: 'fundo de clareamento compativel com o nivel desejado',
+            oswaldGuidance:
+                'Use a Estrela de Oswald assim: amarelo neutraliza com violeta, laranja com azul e vermelho com verde. Preserve ou neutralize o fundo conforme o efeito final.',
+            naturalReference: 'base natural no nivel que vai sustentar a cor final',
+            fantasyReference: 'nuance fantasia ou reflexo que represente o efeito desejado',
+            oxHint: '10 a 20 volumes para deposito e 20 a 30 volumes quando houver abertura controlada.',
+            bleachingTarget: 'clareamento uniforme antes da matizacao ou coloracao final',
+            caution: 'Cheque historico quimico e elasticidade antes de elevar muito a altura de tom.'
+        };
+    }
+
+    function buildTechniqueSteps(technique, profile) {
+        if (technique === 'descoloracao global') {
+            return [
+                'Faca anamnese, teste de mecha e teste de elasticidade antes de iniciar.',
+                'Divida o cabelo em quatro quadrantes para manter aplicacao limpa e uniforme.',
+                'Aplique o descolorante primeiro em comprimento e pontas se a raiz estiver mais quente ou virgem, deixando a raiz por ultimo quando necessario.',
+                `Monitore o fundo de clareamento ate chegar em ${profile.bleachingTarget}.`,
+                'Enxague, reequilibre o pH, seque cerca de 80% e so depois aplique a formula de coloracao ou tonalizacao.'
+            ];
+        }
+
+        if (technique === 'mechas') {
+            return [
+                'Faca teste de mecha e separe o cabelo em quadrantes organizados.',
+                'Selecione mechas finas ou medias conforme o efeito desejado e isole com papel ou manta.',
+                'Sature bem o descolorante para evitar manchas e acompanhe a abertura mecha por mecha.',
+                `Pare o clareamento quando o fundo atingir ${profile.bleachingTarget}.`,
+                'Enxague, trate e tonalize usando a formula final para alinhar reflexo e brilho.'
+            ];
+        }
+
+        if (technique === 'balayage') {
+            return [
+                'Faca diagnostico de fundo e porosidade antes das pinceladas.',
+                'Divida o cabelo em diagonais e aplique em formato de V ou W para um degrade suave.',
+                'Concentre saturacao nas areas que precisam mais luz e esfume a raiz para manter profundidade.',
+                `Controle o clareamento ate chegar em ${profile.bleachingTarget}.`,
+                'Depois do enxague, faca tonalizacao de raiz e comprimento para acabamento mais profissional.'
+            ];
+        }
+
+        if (technique === 'correcao de cor') {
+            return [
+                'Mapeie manchas, fundos diferentes e historico de coloracoes anteriores.',
+                'Se houver excesso de pigmento artificial, considere limpeza de cor ou decapagem controlada antes de clarear.',
+                'Equalize porosidade antes de aplicar nova quimica para evitar sobrecarga em areas frageis.',
+                `Somente depois avance ate ${profile.bleachingTarget} ou para o nivel compativel com o objetivo.`,
+                'Finalize com formula corretiva e acompanhe o resultado mecha por mecha.'
+            ];
+        }
+
+        if (technique === 'retoque de raiz') {
+            return [
+                'Isole apenas o crescimento novo para nao sobrepor quimica onde ja existe clareamento.',
+                'Aplique com precisao na raiz, respeitando a largura do crescimento.',
+                'Monitore a abertura ate igualar com comprimento e pontas.',
+                'Se precisar, emulsione rapidamente para unificar reflexo sem sensibilizar o restante.',
+                'Finalize com tonalizacao ou coloracao de alinhamento.'
+            ];
+        }
+
+        return [
+            'Faca teste de mecha, porosidade e compatibilidade antes da aplicacao.',
+            'Equalize a fibra com tratamento rapido para a cor assentar de forma mais uniforme.',
+            'Aplique a formula da raiz para o comprimento respeitando o tempo de pausa da marca.',
+            'Emulsione nos minutos finais para uniformizar reflexo e brilho.',
+            'Enxague, sele cuticulas e finalize com mascara pos-coloracao.'
+        ];
+    }
+
+    function buildWaterPlan(waterTest) {
+        if (waterTest === 'boia') {
+            return [
+                'Diagnostico: baixa porosidade. O fio resiste a absorver agua e produto.',
+                'Hidratacao: 1 vez por semana com mascaras leves e um pouco de calor umido para melhor penetracao.',
+                'Nutricao: a cada 15 dias com oleos leves, evitando excesso para nao pesar.',
+                'Reconstrucao: a cada 30 dias ou apenas quando houver quimica mais forte.'
+            ];
+        }
+
+        if (waterTest === 'meio') {
+            return [
+                'Diagnostico: porosidade equilibrada. O fio costuma responder bem aos processos.',
+                'Hidratacao: 1 vez por semana para manter maleabilidade e brilho.',
+                'Nutricao: a cada 15 dias para segurar emoliencia e controle de frizz.',
+                'Reconstrucao: a cada 20 a 30 dias, especialmente apos descoloracao.'
+            ];
+        }
+
+        return [
+            'Diagnostico: alta porosidade. O fio absorve rapido, mas perde agua e pigmento com facilidade.',
+            'Hidratacao: 1 a 2 vezes por semana com ativos umectantes e selagem no enxague.',
+            'Nutricao: semanal para repor lipideos e reduzir aspereza.',
+            'Reconstrucao: a cada 10 a 15 dias, com cautela para nao enrijecer demais a fibra.'
+        ];
+    }
+
+    function buildFormulaSection(profile) {
+        return [
+            `Base natural: ${profile.naturalReference}.`,
+            `Cor fantasia ou reflexo: ${profile.fantasyReference}.`,
+            'Calculo pela regra solicitada: 30 g de cor natural + 30 g de cor fantasia = 60 g de coloracao.',
+            'OX = metade do total da coloracao. Entao: 60 / 2 = 30 g de oxidante.',
+            `Oxidante sugerido: ${profile.oxHint}`
+        ];
+    }
+
+    function buildProtocolResponse(currentContext) {
+        const profile = getGoalProfile(currentContext.targetColor, currentContext.baseColor);
+        const techniqueSteps = buildTechniqueSteps(currentContext.technique, profile);
+        const waterPlan = buildWaterPlan(currentContext.waterTest);
+        const formulaLines = buildFormulaSection(profile);
+        const lines = [
+            'Protocolo tecnico sugerido',
+            '',
+            'Diagnostico',
+            `- Base atual: ${currentContext.baseColor}`,
+            `- Objetivo final: ${currentContext.targetColor}`,
+            `- Tecnica escolhida: ${currentContext.technique}`,
+            `- Teste da agua: ${describeWaterTest(currentContext.waterTest)}`,
+            '',
+            'Passo a passo profissional'
+        ];
+
+        techniqueSteps.forEach((step, index) => {
+            lines.push(`${index + 1}. ${step}`);
+        });
+
+        lines.push('');
+        lines.push('Leitura pela Estrela de Oswald');
+        lines.push(`- Fundo esperado: ${profile.expectedBackground}`);
+        lines.push(`- Neutralizacao ou preservacao: ${profile.oswaldGuidance}`);
+        lines.push('');
+        lines.push('Calculo da formula');
+
+        formulaLines.forEach((line) => {
+            lines.push(`- ${line}`);
+        });
+
+        lines.push('');
+        lines.push('Hidratacao e cronograma pelo teste da agua');
+        waterPlan.forEach((line) => {
+            lines.push(`- ${line}`);
+        });
+
+        lines.push('');
+        lines.push('Observacao profissional');
+        lines.push(`- ${profile.caution}`);
+
+        if (
+            currentContext.baseColor === 'preto' &&
+            ['loiro', 'platin', 'clarear'].some((keyword) =>
+                normalizeText(currentContext.targetColor).includes(keyword)
+            )
+        ) {
+            lines.push(
+                '- Em base preta, a subida para loiro costuma exigir mais de uma etapa e muito controle de fundo para preservar integridade.'
+            );
+        }
+
+        lines.push('');
+        lines.push(
+            'Se quiser montar outro protocolo, clique em Reiniciar ou digite reiniciar.'
+        );
+        return lines.join('\n');
+    }
+
+    function processLocalInput(text, currentContext) {
+        const userText = text.trim();
+        const normalizedText = normalizeText(userText);
+
+        if (normalizedText.includes('reiniciar')) {
+            return {
+                response: initialPrompt,
+                context: createInitialContext(),
+                restart: true
+            };
+        }
+
+        if (currentContext.step === 0) {
+            const baseColor = detectBaseColor(userText);
+
+            if (!baseColor) {
+                return {
+                    response:
+                        'Nao consegui identificar a cor base. Tente responder com algo como preto, castanho, loiro, ruivo ou grisalho.',
+                    context: currentContext,
+                    restart: false
+                };
+            }
+
+            return {
+                response: `Entendi. Sua base atual e ${baseColor}. Agora me diga o objetivo final. Exemplos: loiro platinado, ruivo cobre, marsala, cobertura de brancos, castanho frio ou matizacao.`,
+                context: {
+                    step: 1,
+                    baseColor,
+                    targetColor: '',
+                    technique: '',
+                    waterTest: ''
+                },
+                restart: false
+            };
+        }
+
+        if (currentContext.step === 1) {
+            return {
+                response:
+                    `Objetivo registrado: ${userText}. Agora diga qual tecnica o profissional vai usar. Exemplos: descoloracao global, mechas, balayage, correcao de cor, retoque de raiz ou coloracao sem descolorir.`,
+                context: {
+                    step: 2,
+                    baseColor: currentContext.baseColor,
+                    targetColor: userText,
+                    technique: '',
+                    waterTest: ''
+                },
+                restart: false
+            };
+        }
+
+        if (currentContext.step === 2) {
+            const technique = detectTechnique(userText);
+
+            if (!technique) {
+                return {
+                    response:
+                        'Nao consegui identificar a tecnica. Responda com uma destas opcoes: descoloracao global, mechas, balayage, correcao de cor, retoque de raiz ou coloracao sem descolorir.',
+                    context: currentContext,
+                    restart: false
+                };
+            }
+
+            return {
+                response: `Perfeito. Tecnica escolhida: ${technique}. Agora me diga o resultado do teste da agua. Responda com boia, meio ou afunda.`,
+                context: {
+                    step: 3,
+                    baseColor: currentContext.baseColor,
+                    targetColor: currentContext.targetColor,
+                    technique,
+                    waterTest: ''
+                },
+                restart: false
+            };
+        }
+
+        if (currentContext.step === 3) {
+            const waterTest = detectWaterTest(userText);
+
+            if (!waterTest) {
+                return {
+                    response:
+                        'Nao entendi o resultado do teste da agua. Responda com boia, meio ou afunda.',
+                    context: currentContext,
+                    restart: false
+                };
+            }
+
+            const nextContext = {
+                step: 4,
+                baseColor: currentContext.baseColor,
+                targetColor: currentContext.targetColor,
+                technique: currentContext.technique,
+                waterTest
+            };
+
+            return {
+                response: buildProtocolResponse(nextContext),
+                context: nextContext,
+                restart: false
+            };
+        }
+
+        return {
+            response:
+                'Ja concluimos esse protocolo. Se quiser montar outro processo, clique em Reiniciar ou digite reiniciar.',
+            context: currentContext,
+            restart: false
+        };
+    }
+
+    function getConnectionErrorMessage() {
+        return `Nao consegui conectar ao servidor em ${apiOrigin}. Execute "python app.py" nesta pasta e abra http://127.0.0.1:8000.`;
+    }
+
+    function addMessage(text, sender) {
+        const message = document.createElement('div');
+        message.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
+        message.textContent = text;
+        chatWindow.appendChild(message);
+        scrollToBottom();
+    }
+
+    function clearMessages() {
+        chatWindow.innerHTML = '';
+    }
+
+    function scrollToBottom() {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'typing-indicator';
+        indicator.innerHTML = '<span></span><span></span><span></span>';
+        chatWindow.appendChild(indicator);
+        scrollToBottom();
+        return indicator;
+    }
+
+    function removeTypingIndicator(indicator) {
+        if (indicator && indicator.parentNode) {
+            indicator.remove();
+        }
+    }
+
+    function setNotice(message, variant) {
+        if (!message) {
+            noticeBox.textContent = '';
+            noticeBox.className = 'notice hidden';
+            return;
+        }
+
+        noticeBox.textContent = message;
+        noticeBox.className = `notice notice-${variant}`;
+    }
+
+    function setStatus(mode) {
+        interactionMode = mode;
+        statusBadge.className = `status-badge status-${mode}`;
+
+        if (mode === 'online') {
+            statusBadge.textContent = 'Servidor online';
+            return;
+        }
+
+        if (mode === 'local') {
+            statusBadge.textContent = 'Modo local';
+            return;
+        }
+
+        statusBadge.textContent = 'Conectando';
+    }
+
+    function setFormEnabled(enabled) {
+        userInput.disabled = !enabled;
+        sendBtn.disabled = !enabled;
+        restartBtn.disabled = !enabled;
+    }
+
+    function restartConversation() {
+        context = createInitialContext();
+        clearMessages();
+        addMessage(initialPrompt, 'bot');
+        userInput.value = '';
+        userInput.focus();
+    }
+
+    function buildError(message, isConnectionError) {
+        const error = new Error(message);
+        error.isConnectionError = Boolean(isConnectionError);
+        return error;
+    }
+
+    async function fetchJson(path, options = {}) {
+        let response;
+
+        try {
+            response = await fetch(buildApiUrl(path), options);
+        } catch (error) {
+            throw buildError(getConnectionErrorMessage(), true);
+        }
+
+        const contentType = response.headers.get('Content-Type') || '';
+        if (!contentType.includes('application/json')) {
+            throw buildError('O servidor respondeu em um formato invalido.', true);
+        }
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+            throw buildError(payload.error || 'Nao foi possivel concluir a requisicao.', false);
+        }
+
+        return payload;
+    }
+
+    async function requestHealth() {
+        return fetchJson('/api/health');
+    }
+
+    async function requestBotResponse(text) {
+        return fetchJson('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: text,
+                context
+            })
+        });
+    }
+
+    async function requestResponse(text) {
+        if (!isServerOnline) {
+            return processLocalInput(text, context);
+        }
+
+        return requestBotResponse(text);
+    }
+
+    async function bootstrap(resetConversation) {
+        setStatus('connecting');
+        setFormEnabled(false);
+        retryBtn.disabled = true;
+
+        try {
+            const health = await requestHealth();
+            isServerOnline = true;
+            initialPrompt = typeof health.initialPrompt === 'string' ? health.initialPrompt : fallbackPrompt;
+
+            setStatus('online');
+            setNotice('', 'info');
+            retryBtn.disabled = false;
+            setFormEnabled(true);
+
+            if (resetConversation) {
+                restartConversation();
+            } else {
+                userInput.focus();
+            }
+        } catch (error) {
+            isServerOnline = false;
+            setStatus('local');
+            setFormEnabled(true);
+            retryBtn.disabled = false;
+            setNotice(
+                `${error.message} O app entrou em modo local para continuar funcionando.`,
+                'warning'
+            );
+
+            if (resetConversation) {
+                restartConversation();
+            } else {
+                userInput.focus();
+            }
+        }
+    }
+
+    async function processInput(text) {
+        const indicator = showTypingIndicator();
+        isRequestInFlight = true;
+        setFormEnabled(false);
+        retryBtn.disabled = true;
+
+        try {
+            const payload = await requestResponse(text);
+            context = payload.context || createInitialContext();
+            removeTypingIndicator(indicator);
+            addMessage(payload.response, 'bot');
+
+            if (payload.restart) {
+                context = createInitialContext();
+            }
+
+            setNotice('', 'info');
+        } catch (error) {
+            removeTypingIndicator(indicator);
+
+            if (error.isConnectionError) {
+                isServerOnline = false;
+                setStatus('local');
+
+                const fallbackPayload = processLocalInput(text, context);
+                context = fallbackPayload.context || createInitialContext();
+                addMessage(fallbackPayload.response, 'bot');
+
+                if (fallbackPayload.restart) {
+                    context = createInitialContext();
+                }
+
+                setNotice(
+                    `${error.message} Continuei a conversa em modo local para nao travar o app.`,
+                    'warning'
+                );
+            } else {
+                addMessage(error.message, 'bot');
+                setNotice(error.message, 'error');
+            }
+        } finally {
+            isRequestInFlight = false;
+            retryBtn.disabled = false;
+            setFormEnabled(true);
+
+            if (interactionMode !== 'connecting') {
+                userInput.focus();
+            }
+        }
+    }
+
+    function handleSend() {
+        const text = userInput.value.trim();
+
+        if (!text || isRequestInFlight) {
+            return;
+        }
+
+        addMessage(text, 'user');
+        userInput.value = '';
+        processInput(text);
+    }
+
+    sendBtn.addEventListener('click', handleSend);
+    retryBtn.addEventListener('click', () => {
+        bootstrap(true);
+    });
+    restartBtn.addEventListener('click', () => {
+        restartConversation();
+        setNotice('', 'info');
+    });
+    userInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            handleSend();
+        }
+    });
+
+    bootstrap(true);
+});
