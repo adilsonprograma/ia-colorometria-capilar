@@ -8,12 +8,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusBadge = document.getElementById('statusBadge');
 
     const defaultServerOrigin = 'http://127.0.0.1:8000';
-    const apiOrigin =
+    const apiOriginParam = new URLSearchParams(window.location.search).get('apiOrigin');
+    const apiOriginMeta = document.querySelector('meta[name="coloria-api-origin"]')?.content || '';
+    const apiOriginGlobal =
+        typeof window.COLORIA_API_ORIGIN === 'string' ? window.COLORIA_API_ORIGIN : '';
+    const apiOriginStored = getStoredApiOrigin();
+    const fallbackApiOrigin =
         window.location.protocol === 'file:' ? defaultServerOrigin : window.location.origin;
+    const configuredApiOrigin =
+        apiOriginParam || apiOriginGlobal || apiOriginMeta || apiOriginStored || fallbackApiOrigin;
+    const apiOrigin = normalizeApiOrigin(configuredApiOrigin, fallbackApiOrigin);
+
+    if (apiOriginParam) {
+        persistApiOrigin(apiOrigin);
+    }
     const fallbackPrompt =
         'Ola! Sou a ColorIA. Vamos montar um protocolo tecnico de colorimetria. Primeiro, me diga qual e a cor atual ou base do cabelo.';
-    const formulaReferencePartGrams ='a proporção indicada pelo fabricante ex: um para um ou um para um e meio';
-    const fantasyToneGuidance = { ;
+    const defaultFormulaPartGrams = 30;
+    const formulaReferenceGuidance =
+        'A proporcao final deve seguir a indicacao do fabricante (ex.: 1:1 ou 1:1,5).';
     const baseColorToneLevels = {
         preto: '1',
         castanho: '5',
@@ -68,8 +81,32 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function getStoredApiOrigin() {
+        try {
+            return window.localStorage.getItem('coloria.apiOrigin') || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
+    function persistApiOrigin(value) {
+        try {
+            window.localStorage.setItem('coloria.apiOrigin', value);
+        } catch (error) {
+            // Armazenamento local pode estar indisponivel em alguns navegadores.
+        }
+    }
+
+    function normalizeApiOrigin(value, fallback) {
+        const candidate = String(value || '').trim();
+        const fallbackValue = String(fallback || '').trim();
+        const resolved = candidate || fallbackValue;
+        return resolved.replace(/\/+$/, '');
+    }
+
     function buildApiUrl(path) {
-        return `${apiOrigin}${path}`;
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return `${apiOrigin}${normalizedPath}`;
     }
 
     function normalizeText(text) {
@@ -524,8 +561,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildChemistrySection(profile, formulaProfile) {
-        const naturalGrams = formulaReferencePartGrams;
-        const fantasyGrams = formulaReferencePartGrams;
+        const naturalGrams = defaultFormulaPartGrams;
+        const fantasyGrams = defaultFormulaPartGrams;
         const resultGrams = naturalGrams + fantasyGrams;
         const oxidantGrams = resultGrams / 2;
 
@@ -534,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `Formula em gramas: ${naturalGrams} g do tom natural ${formulaProfile.naturalTone} + ${fantasyGrams} g da nuance ${formulaProfile.fantasyTone} = ${resultGrams} g de coloracao.`,
             `OX pela leitura da elevacao: ${formulaProfile.oxidantVolume} volumes. ${formulaProfile.oxidantAction}`,
             `Pela regra do projeto, OX = metade do total da coloracao: ${resultGrams} / 2 = ${oxidantGrams} g de oxidante.`,
+            formulaReferenceGuidance,
             `Leitura tecnica complementar: ${profile.oxHint}`
         ];
     }

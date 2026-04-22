@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -173,9 +174,16 @@ def create_server(host: str, port: int) -> ReusableThreadingHTTPServer:
 
 
 def parse_args() -> argparse.Namespace:
+    default_host = os.environ.get("HOST", "0.0.0.0")
+
+    try:
+        default_port = int(os.environ.get("PORT", "8000"))
+    except ValueError:
+        default_port = 8000
+
     parser = argparse.ArgumentParser(description="Servidor local do ColorIA.")
-    parser.add_argument("--host", default="127.0.0.1", help="Host para expor o servidor.")
-    parser.add_argument("--port", type=int, default=8000, help="Porta do servidor.")
+    parser.add_argument("--host", default=default_host, help="Host para expor o servidor.")
+    parser.add_argument("--port", type=int, default=default_port, help="Porta do servidor.")
     return parser.parse_args()
 
 

@@ -53,6 +53,28 @@ start_coloria.bat
 
 Esse atalho inicia o servidor e tenta abrir o navegador automaticamente.
 
+## Deploy
+
+Para deploy (Render, Railway, Fly.io, VPS etc.), o servidor agora le automaticamente:
+
+- `HOST` (padrao `0.0.0.0`)
+- `PORT` (padrao `8000`)
+
+Exemplo:
+
+```bash
+HOST=0.0.0.0 PORT=8000 python app.py
+```
+
+No frontend, a API pode ser configurada de 4 formas, nesta ordem de prioridade:
+
+1. query string `?apiOrigin=https://seu-backend.com`
+2. `window.COLORIA_API_ORIGIN`
+3. meta tag `<meta name="coloria-api-origin" content="https://seu-backend.com">`
+4. origem atual da pagina (`window.location.origin`)
+
+Se a API estiver em outro dominio, configure uma dessas opcoes para evitar fallback para modo local.
+
 ## Como usar o assistente
 
 O fluxo principal do app acontece em 4 etapas:
