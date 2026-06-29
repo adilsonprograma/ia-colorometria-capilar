@@ -32,26 +32,14 @@ Nao e necessario instalar frameworks web, porque o projeto usa apenas biblioteca
 
 ## Inicio rapido
 
-Na pasta do projeto, execute:
+1. Instale o [Node.js](https://nodejs.org/) na sua maquina.
+2. Baixe o projeto e extraia.
+3. De um duplo clique no arquivo `start_coloria.bat` para iniciar o servidor e abrir o navegador automaticamente.
 
+Se preferir usar o terminal:
 ```bash
-python app.py
+npm start
 ```
-
-Depois abra:
-
-```text
-
-http://127.0.0.1:8000
-```
-
-No Windows, voce tambem pode usar:
-
-```text
-start_coloria.bat
-```
-
-Esse atalho inicia o servidor e tenta abrir o navegador automaticamente.
 
 ## Deploy
 
