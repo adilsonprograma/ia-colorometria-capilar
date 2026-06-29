@@ -1175,8 +1175,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setFormEnabled(true);
             retryBtn.disabled = false;
             setNotice(
-                `${error.message} O app entrou em modo local para continuar funcionando.`,
-                'warning'
+                'Conectado no Modo Local (Offline). Você pode usar o assistente normalmente!',
+                'info'
             );
 
             if (resetConversation) {
@@ -1221,8 +1221,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 setNotice(
-                    `${error.message} Continuei a conversa em modo local para nao travar o app.`,
-                    'warning'
+                    'Modo Local ativado automaticamente para garantir o funcionamento.',
+                    'info'
                 );
             } else {
                 addMessage(error.message, 'bot');
