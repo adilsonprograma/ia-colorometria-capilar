@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="coloria-api-origin" content="">
+    <title>ColorIA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="page-shell">
+        <div class="background-glow background-glow-left"></div>
+        <div class="background-glow background-glow-right"></div>
+
+        <section class="app-card" aria-label="Chat ColorIA">
+            <header class="app-header">
+                <div class="brand">
+                    <div class="brand-mark">CI</div>
+                    <div class="brand-copy">
+                        <h1>ColorIA</h1>
+                        <p>Assistente local de colorimetria capilar</p>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <span id="statusBadge" class="status-badge status-connecting">Conectando</span>
+                    <button id="retryBtn" class="secondary-btn" type="button">Reconectar</button>
+                    <button id="restartBtn" class="secondary-btn" type="button">Reiniciar</button>
+                </div>
+            </header>
+
+            <section id="noticeBox" class="notice hidden" aria-live="polite"></section>
+
+            <div class="stepper" id="stepper">
+                <div class="step active" data-step="0">
+                    <span class="step-num">1</span>
+                    <span class="step-label">Base</span>
+                </div>
+                <div class="step" data-step="1">
+                    <span class="step-num">2</span>
+                    <span class="step-label">Objetivo</span>
+                </div>
+                <div class="step" data-step="2">
+                    <span class="step-num">3</span>
+                    <span class="step-label">Técnica</span>
+                </div>
+                <div class="step" data-step="3">
+                    <span class="step-num">4</span>
+                    <span class="step-label">Porosidade</span>
+                </div>
+                <div class="step" data-step="4">
+                    <span class="step-num">5</span>
+                    <span class="step-label">Protocolo</span>
+                </div>
+            </div>
+
+            <div class="app-body" id="appBody">
+                <div class="chat-column" id="chatColumn">
+                    <main id="chatWindow" class="chat-window" aria-live="polite" aria-label="Mensagens">
+                        <div class="message bot-message">Iniciando o assistente...</div>
+                    </main>
+
+                    <div id="chipsContainer" class="chips-container hidden"></div>
+
+                    <footer class="composer">
+                        <label class="sr-only" for="userInput">Digite sua mensagem</label>
+                        <input
+                            id="userInput"
+                            type="text"
+                            autocomplete="off"
+                            placeholder="Ex.: meu cabelo esta castanho escuro"
+                        >
+                        <button id="sendBtn" class="primary-btn" type="button">Enviar</button>
+                    </footer>
+                </div>
+
+                <aside class="protocol-column" id="protocolColumn">
+                    <div class="mobile-tabs" id="mobileTabs">
+                        <button id="tabChatBtn" class="tab-btn active" type="button">Chat</button>
+                        <button id="tabProtocolBtn" class="tab-btn" type="button">Protocolo</button>
+                    </div>
+
+                    <div class="protocol-dashboard" id="protocolDashboard">
+                        <div class="dashboard-placeholder" id="dashboardPlaceholder">
+                            <div class="placeholder-icon">📋</div>
+                            <h3>Painel de Diagnóstico</h3>
+                            <p>Responda às etapas no chat para gerar o protocolo capilar e os cálculos de colorimetria em tempo real.</p>
+                        </div>
+
+                        <div class="dashboard-content hidden" id="dashboardContent">
+                            <!-- Diagnóstico -->
+                            <div class="dashboard-card card-diagnostic">
+                                <h3>Diagnóstico Capilar</h3>
+                                <div class="badge-grid">
+                                    <div class="badge-item">
+                                        <span class="badge-label">Cor Base</span>
+                                        <span class="badge-val" id="valBaseColor">-</span>
+                                    </div>
+                                    <div class="badge-item">
+                                        <span class="badge-label">Objetivo</span>
+                                        <span class="badge-val" id="valTargetColor">-</span>
+                                    </div>
+                                    <div class="badge-item">
+                                        <span class="badge-label">Técnica</span>
+                                        <span class="badge-val" id="valTechnique">-</span>
+                                    </div>
+                                    <div class="badge-item">
+                                        <span class="badge-label">Porosidade</span>
+                                        <span class="badge-val" id="valPorosity">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Fórmula e Química -->
+                            <div class="dashboard-card card-formula">
+                                <h3>Fórmula de Coloração</h3>
+                                <div class="formula-display">
+                                    <div class="formula-box">
+                                        <div class="formula-part">
+                                            <span class="formula-num" id="valNaturalTone">-</span>
+                                            <span class="formula-label">Natural</span>
+                                        </div>
+                                        <span class="formula-operator">+</span>
+                                        <div class="formula-part">
+                                            <span class="formula-num" id="valFantasyTone">-</span>
+                                            <span class="formula-label">Fantasia</span>
+                                        </div>
+                                        <span class="formula-operator">=</span>
+                                        <div class="formula-part highlight">
+                                            <span class="formula-num" id="valResultTone">-</span>
+                                            <span class="formula-label">Resultado</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mixing-proportions">
+                                    <h4 class="mixing-title">Proporção Referência (Total: 60g)</h4>
+                                    <div class="mixing-bar">
+                                        <div class="mix-segment natural-segment">30g Tom Natural</div>
+                                        <div class="mix-segment fantasy-segment">30g Nuance Fantasia</div>
+                                    </div>
+                                    <div class="oxidant-mix">
+                                        <div class="ox-vol-container">
+                                            <span class="ox-vol-value" id="valOxVolume">-</span>
+                                            <span class="ox-vol-label">VOL</span>
+                                        </div>
+                                        <div class="ox-details">
+                                            <strong>Oxidante: <span id="valOxGrams">-</span> g</strong> (1:1.5)
+                                            <p class="ox-action-text" id="valOxAction">-</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Oswald & Regra do 11 -->
+                            <div class="dashboard-card card-oswald">
+                                <h3>Oswald & Regra do 11</h3>
+                                <div class="oswald-guidance-box">
+                                    <p id="valOswaldGuidance">-</p>
+                                </div>
+                                <div class="rule-11-display">
+                                    <div class="rule-11-header">Regra do 11 (Neutralização de Fundo)</div>
+                                    <div class="rule-11-math">11 - <span id="valNaturalToneRule">-</span> = <strong id="valMixCm">-</strong> cm</div>
+                                    <p class="rule-11-explanation">
+                                        Indica adicionar até <strong id="valMixCmDesc">-</strong> cm de corretor na coloração para neutralizar o calor residual do fundo.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Cronograma Capilar -->
+                            <div class="dashboard-card card-schedule">
+                                <h3>Cronograma Capilar Sugerido</h3>
+                                <div class="schedule-list">
+                                    <div class="schedule-row">
+                                        <div class="schedule-info">
+                                            <span>Hidratação</span>
+                                            <strong id="valHydrationFreq">-</strong>
+                                        </div>
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar-fill progress-hydration" id="barHydration" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="schedule-row">
+                                        <div class="schedule-info">
+                                            <span>Nutrição</span>
+                                            <strong id="valNutritionFreq">-</strong>
+                                        </div>
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar-fill progress-nutrition" id="barNutrition" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="schedule-row">
+                                        <div class="schedule-info">
+                                            <span>Reconstrução</span>
+                                            <strong id="valReconstructionFreq">-</strong>
+                                        </div>
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar-fill progress-reconstruction" id="barReconstruction" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Passo a Passo -->
+                            <div class="dashboard-card card-steps">
+                                <h3>Passo a Passo Técnico</h3>
+                                <ol class="steps-ordered-list" id="valStepsList"></ol>
+                            </div>
+
+                            <!-- Observações de Segurança -->
+                            <div class="dashboard-card card-caution">
+                                <h3>Observação Profissional</h3>
+                                <p class="caution-text" id="valCaution">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </section>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
