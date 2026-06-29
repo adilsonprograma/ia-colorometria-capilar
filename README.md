@@ -75,6 +75,15 @@ No frontend, a API pode ser configurada de 4 formas, nesta ordem de prioridade:
 
 Se a API estiver em outro dominio, configure uma dessas opcoes para evitar fallback para modo local.
 
+### GitHub Pages (Frontend Only / Offline Mode)
+
+Como o aplicativo possui um sistema de **fallback offline (Modo Local)** robusto construído puramente em JavaScript (presente no `frontend/index.js`), você pode hospedá-lo 100% de graça via GitHub Pages sem precisar hospedar o backend Python:
+
+1. Suba este repositório para o seu GitHub.
+2. No seu repositório do GitHub, vá em **Settings > Pages**.
+3. Na seção "Build and deployment", selecione a branch `main` e mude a pasta de raiz (`/`) para a pasta `/frontend`.
+4. Salve. O GitHub vai publicar seu site automaticamente e a IA responderá diretamente através do processamento offline configurado no navegador do usuário.
+
 ## Como usar o assistente
 
 O fluxo principal do app acontece em 4 etapas:
@@ -120,12 +129,12 @@ O app combina:
 
 - tom natural de `1` a `10`
 - cor fantasia de `0.11` a `0.6`
-- oxidante em metade do total da coloracao
+- oxidante em 1,5 vezes o total da coloração (proporção 1:1,5)
 - leitura de numeracao, quimica da formula, colorimetria e mecanismo de acao
 
 ```text
 tom natural + cor fantasia = cor desejada aproximada
-OX = metade do total da coloracao
+OX = 1,5 x total da coloração (proporção 1:1,5)
 ```
 
 Exemplo pratico:
@@ -133,7 +142,7 @@ Exemplo pratico:
 ```text
 10 + 0.11 = 10.11
 30 g do tom natural 10 + 30 g da nuance 0.11 = 60 g de coloracao
-60 / 2 = 30 g de oxidante
+60 x 1.5 = 90 g de oxidante
 ```
 
 Importante:
@@ -199,13 +208,17 @@ Mesmo assim, o modo recomendado continua sendo o servidor local, porque ele cent
 ## Estrutura do projeto
 
 ```text
-app.py               servidor HTTP e rotas da API
-chat_logic.py        logica da conversa e montagem do protocolo
-index.html           estrutura da interface
-style.css            estilos da interface
-index.js             fluxo do chat no frontend e modo local
-test_app.py          testes do servidor e da API
-test_chat_logic.py   testes da logica de colorimetria
+app.py                               entrada principal (compatibilidade)
+chat_logic.py                        ponte de compatibilidade para imports antigos
+backend/server.py                    servidor HTTP e rotas da API
+backend/estudo_capilar/chat_logic.py fluxo da conversa
+backend/estudo_capilar/estudo.py     estudo capilar e montagem do protocolo
+backend/estudo_capilar/colorimetria.py calculo de colorimetria e formula
+frontend/index.html                  estrutura da interface
+frontend/style.css                   estilos da interface
+frontend/index.js                    fluxo do chat no frontend e modo local
+tests/test_app.py                    testes do servidor e da API
+tests/test_chat_logic.py             testes da logica de colorimetria
 start_coloria.bat    atalho para iniciar no Windows
 README.md            documentacao do projeto
 ```
@@ -214,7 +227,7 @@ README.md            documentacao do projeto
 
 ### Backend
 
-O backend fica em `app.py` e faz tres coisas principais:
+O backend tem entrada em `app.py` e implementacao em `backend/server.py`, fazendo tres coisas principais:
 
 - serve os arquivos estaticos do frontend
 - responde o health check em `/api/health`
@@ -222,7 +235,7 @@ O backend fica em `app.py` e faz tres coisas principais:
 
 ### Motor de conversa
 
-O motor fica em `chat_logic.py` e controla:
+O motor da conversa fica em `backend/estudo_capilar/chat_logic.py` e controla:
 
 - estado da conversa
 - reconhecimento de cor base
@@ -233,7 +246,7 @@ O motor fica em `chat_logic.py` e controla:
 
 ### Frontend
 
-O frontend fica em `index.html`, `style.css` e `index.js` e cuida de:
+O frontend fica em `frontend/index.html`, `frontend/style.css` e `frontend/index.js` e cuida de:
 
 - renderizar a conversa
 - enviar requisicoes para a API
@@ -318,7 +331,7 @@ Significado:
 Para rodar a suite de testes:
 
 ```bash
-python -m unittest -v
+python -m unittest discover -s tests -v
 ```
 
 Os testes atuais cobrem:
@@ -386,7 +399,7 @@ Isso pode acontecer. O app segue a regra definida no projeto, mas a formula real
 
 Alguns pontos naturais de evolucao:
 
-- adicionar mais perfis de objetivo em `chat_logic.py`
+- adicionar mais perfis de objetivo em `backend/estudo_capilar/estudo.py`
 - expandir tecnicas reconhecidas
 - ajustar formulas por marca profissional
 - salvar historico de atendimentos
@@ -397,19 +410,19 @@ Alguns pontos naturais de evolucao:
 
 Se voce quiser alterar a inteligencia do protocolo, os pontos mais importantes sao:
 
-- `get_goal_profile()` em `chat_logic.py`
-- `build_technique_steps()` em `chat_logic.py`
-- `build_water_plan()` em `chat_logic.py`
-- `build_protocol_response()` em `chat_logic.py`
+- `get_goal_profile()` em `backend/estudo_capilar/estudo.py`
+- `build_technique_steps()` em `backend/estudo_capilar/estudo.py`
+- `build_water_plan()` em `backend/estudo_capilar/estudo.py`
+- `build_protocol_response()` em `backend/estudo_capilar/estudo.py`
+- `build_formula_profile()` em `backend/estudo_capilar/colorimetria.py`
+- `calculate_colorimetry()` em `backend/estudo_capilar/colorimetria.py`
 
 Se quiser alterar comportamento da interface:
 
-- `index.js` para fluxo e estados
-- `index.html` para estrutura
-- `style.css` para visual
+- `frontend/index.js` para fluxo e estados
+- `frontend/index.html` para estrutura
+- `frontend/style.css` para visual
 
 ## Licenca e uso
 
 Se este projeto for usado em ambiente profissional, o ideal e manter um aviso claro de que as respostas sao sugestoes tecnicas e devem ser conferidas por um colorista antes da aplicacao real.
-# ia-colorometria-capilar
-# ia-colorometria-capilar

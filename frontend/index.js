@@ -7,6 +7,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const noticeBox = document.getElementById('noticeBox');
     const statusBadge = document.getElementById('statusBadge');
 
+    const stepper = document.getElementById('stepper');
+    const chipsContainer = document.getElementById('chipsContainer');
+    const tabChatBtn = document.getElementById('tabChatBtn');
+    const tabProtocolBtn = document.getElementById('tabProtocolBtn');
+    const chatColumn = document.getElementById('chatColumn');
+    const protocolColumn = document.getElementById('protocolColumn');
+    const dashboardPlaceholder = document.getElementById('dashboardPlaceholder');
+    const dashboardContent = document.getElementById('dashboardContent');
+
+    const valBaseColor = document.getElementById('valBaseColor');
+    const valTargetColor = document.getElementById('valTargetColor');
+    const valTechnique = document.getElementById('valTechnique');
+    const valPorosity = document.getElementById('valPorosity');
+    const valNaturalTone = document.getElementById('valNaturalTone');
+    const valFantasyTone = document.getElementById('valFantasyTone');
+    const valResultTone = document.getElementById('valResultTone');
+    const valOxVolume = document.getElementById('valOxVolume');
+    const valOxGrams = document.getElementById('valOxGrams');
+    const valOxAction = document.getElementById('valOxAction');
+    const valOswaldGuidance = document.getElementById('valOswaldGuidance');
+    const valNaturalToneRule = document.getElementById('valNaturalToneRule');
+    const valMixCm = document.getElementById('valMixCm');
+    const valMixCmDesc = document.getElementById('valMixCmDesc');
+    const valHydrationFreq = document.getElementById('valHydrationFreq');
+    const valNutritionFreq = document.getElementById('valNutritionFreq');
+    const valReconstructionFreq = document.getElementById('valReconstructionFreq');
+    const barHydration = document.getElementById('barHydration');
+    const barNutrition = document.getElementById('barNutrition');
+    const barReconstruction = document.getElementById('barReconstruction');
+    const valStepsList = document.getElementById('valStepsList');
+    const valCaution = document.getElementById('valCaution');
+
     const defaultServerOrigin = 'http://127.0.0.1:8000';
     const apiOriginParam = new URLSearchParams(window.location.search).get('apiOrigin');
     const apiOriginMeta = document.querySelector('meta[name="coloria-api-origin"]')?.content || '';
@@ -564,13 +596,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const naturalGrams = defaultFormulaPartGrams;
         const fantasyGrams = defaultFormulaPartGrams;
         const resultGrams = naturalGrams + fantasyGrams;
-        const oxidantGrams = resultGrams / 2;
+        const oxidantGrams = resultGrams * 1.5;
 
         return [
             'Creme colorante alcalino: a amonia ou agente similar abre a cuticula para a entrada dos precursores de cor.',
             `Formula em gramas: ${naturalGrams} g do tom natural ${formulaProfile.naturalTone} + ${fantasyGrams} g da nuance ${formulaProfile.fantasyTone} = ${resultGrams} g de coloracao.`,
             `OX pela leitura da elevacao: ${formulaProfile.oxidantVolume} volumes. ${formulaProfile.oxidantAction}`,
-            `Pela regra do projeto, OX = metade do total da coloracao: ${resultGrams} / 2 = ${oxidantGrams} g de oxidante.`,
+            `Pela regra do projeto, OX = 1,5 vezes o total da coloracao (proporcao 1:1,5): ${resultGrams} x 1.5 = ${oxidantGrams} g de oxidante.`,
             formulaReferenceGuidance,
             `Leitura tecnica complementar: ${profile.oxHint}`
         ];
@@ -855,12 +887,211 @@ document.addEventListener('DOMContentLoaded', () => {
         restartBtn.disabled = !enabled;
     }
 
+    function updateStepper(step) {
+        if (!stepper) return;
+        const steps = stepper.querySelectorAll('.step');
+        steps.forEach((el) => {
+            el.classList.remove('active', 'completed');
+            const stepNum = Number.parseInt(el.getAttribute('data-step') || '0', 10);
+            if (stepNum < step) {
+                el.classList.add('completed');
+            } else if (stepNum === step) {
+                el.classList.add('active');
+            }
+        });
+    }
+
+    function renderChips(step) {
+        if (!chipsContainer) return;
+        chipsContainer.innerHTML = '';
+        let options = [];
+
+        if (step === 0) {
+            options = [
+                { label: 'Preto', value: 'Preto' },
+                { label: 'Castanho', value: 'Castanho' },
+                { label: 'Loiro', value: 'Loiro' },
+                { label: 'Ruivo', value: 'Ruivo' },
+                { label: 'Grisalho', value: 'Grisalho' }
+            ];
+        } else if (step === 1) {
+            options = [
+                { label: 'Loiro Platinado', value: 'Loiro platinado' },
+                { label: 'Ruivo Cobre', value: 'Ruivo cobre' },
+                { label: 'Marsala', value: 'Marsala' },
+                { label: 'Castanho Frio', value: 'Castanho frio' },
+                { label: 'Cobertura de Brancos', value: 'Cobertura de brancos' }
+            ];
+        } else if (step === 2) {
+            options = [
+                { label: 'Descoloração Global', value: 'Descoloração global' },
+                { label: 'Mechas', value: 'Mechas' },
+                { label: 'Balayage', value: 'Balayage' },
+                { label: 'Retoque de Raiz', value: 'Retoque de raiz' },
+                { label: 'Coloração sem Descolorir', value: 'Coloração sem descolorir' },
+                { label: 'Correção de Cor', value: 'Correção de cor' }
+            ];
+        } else if (step === 3) {
+            options = [
+                { label: 'Boia (Baixa Porosidade)', value: 'Boia' },
+                { label: 'Meio (Porosidade Equilibrada)', value: 'Meio' },
+                { label: 'Afunda (Alta Porosidade)', value: 'Afunda' }
+            ];
+        }
+
+        if (options.length > 0 && !isRequestInFlight) {
+            options.forEach(opt => {
+                const chipEl = document.createElement('button');
+                chipEl.className = 'chip';
+                chipEl.type = 'button';
+                chipEl.textContent = opt.label;
+                chipEl.addEventListener('click', () => {
+                    if (isRequestInFlight) return;
+                    addMessage(opt.value, 'user');
+                    processInput(opt.value);
+                });
+                chipsContainer.appendChild(chipEl);
+            });
+            chipsContainer.classList.remove('hidden');
+        } else {
+            chipsContainer.classList.add('hidden');
+        }
+    }
+
+    function updateDashboard() {
+        if (!dashboardPlaceholder || !dashboardContent) return;
+
+        if (!context.baseColor) {
+            dashboardPlaceholder.classList.remove('hidden');
+            dashboardContent.classList.add('hidden');
+            return;
+        }
+
+        dashboardPlaceholder.classList.add('hidden');
+        dashboardContent.classList.remove('hidden');
+
+        // Badges do diagnóstico
+        if (valBaseColor) valBaseColor.textContent = context.baseColor || '-';
+        if (valTargetColor) valTargetColor.textContent = context.targetColor || '-';
+        if (valTechnique) valTechnique.textContent = context.technique || '-';
+        if (valPorosity) valPorosity.textContent = context.waterTest ? describeWaterTest(context.waterTest) : '-';
+
+        // Cartões
+        const cardFormula = document.querySelector('.card-formula');
+        const cardOswald = document.querySelector('.card-oswald');
+        const cardSteps = document.querySelector('.card-steps');
+        const cardSchedule = document.querySelector('.card-schedule');
+        const cardCaution = document.querySelector('.card-caution');
+
+        // Fórmula e Oswald
+        if (context.targetColor) {
+            if (cardFormula) cardFormula.classList.remove('hidden');
+            if (cardOswald) cardOswald.classList.remove('hidden');
+
+            const profile = getGoalProfile(context.targetColor, context.baseColor);
+            const formulaProfile = buildFormulaProfile(context.targetColor, context.baseColor);
+
+            if (valNaturalTone) valNaturalTone.textContent = formulaProfile.naturalTone;
+            if (valNaturalToneRule) valNaturalToneRule.textContent = formulaProfile.naturalTone;
+            if (valFantasyTone) valFantasyTone.textContent = formulaProfile.fantasyTone;
+            if (valResultTone) valResultTone.textContent = formulaProfile.approximateResult;
+            
+            if (valOxVolume) valOxVolume.textContent = formulaProfile.oxidantVolume;
+            if (valOxGrams) valOxGrams.textContent = (30 + 30) * 1.5;
+            if (valOxAction) valOxAction.textContent = formulaProfile.oxidantAction;
+
+            if (valOswaldGuidance) valOswaldGuidance.textContent = profile.oswaldGuidance;
+            if (valMixCm) valMixCm.textContent = formulaProfile.mixRule11Amount;
+            if (valMixCmDesc) valMixCmDesc.textContent = formulaProfile.mixRule11Amount;
+        } else {
+            if (cardFormula) cardFormula.classList.add('hidden');
+            if (cardOswald) cardOswald.classList.add('hidden');
+        }
+
+        // Passo a Passo da Técnica
+        if (context.technique) {
+            if (cardSteps) cardSteps.classList.remove('hidden');
+            const profile = getGoalProfile(context.targetColor, context.baseColor);
+            const steps = buildTechniqueSteps(context.technique, profile);
+            
+            if (valStepsList) {
+                valStepsList.innerHTML = '';
+                steps.forEach(stepText => {
+                    const li = document.createElement('li');
+                    li.textContent = stepText;
+                    valStepsList.appendChild(li);
+                });
+            }
+        } else {
+            if (cardSteps) cardSteps.classList.add('hidden');
+        }
+
+        // Cronograma e Precaução
+        if (context.waterTest) {
+            if (cardSchedule) cardSchedule.classList.remove('hidden');
+            if (cardCaution) cardCaution.classList.remove('hidden');
+
+            let hydrationFreq = '', nutritionFreq = '', reconstructionFreq = '';
+            let hydrationFill = '0%', nutritionFill = '0%', reconstructionFill = '0%';
+
+            if (context.waterTest === 'boia') {
+                hydrationFreq = '1x / semana';
+                hydrationFill = '60%';
+                nutritionFreq = 'A cada 15 dias';
+                nutritionFill = '40%';
+                reconstructionFreq = 'A cada 30 dias';
+                reconstructionFill = '20%';
+            } else if (context.waterTest === 'meio') {
+                hydrationFreq = '1x / semana';
+                hydrationFill = '60%';
+                nutritionFreq = 'A cada 15 dias';
+                nutritionFill = '40%';
+                reconstructionFreq = 'A cada 20 a 30 dias';
+                reconstructionFill = '30%';
+            } else if (context.waterTest === 'afunda') {
+                hydrationFreq = '1 a 2x / semana';
+                hydrationFill = '90%';
+                nutritionFreq = 'Semanal';
+                nutritionFill = '80%';
+                reconstructionFreq = 'A cada 10 a 15 dias';
+                reconstructionFill = '70%';
+            }
+
+            if (valHydrationFreq) valHydrationFreq.textContent = hydrationFreq;
+            if (barHydration) barHydration.style.width = hydrationFill;
+
+            if (valNutritionFreq) valNutritionFreq.textContent = nutritionFreq;
+            if (barNutrition) barNutrition.style.width = nutritionFill;
+
+            if (valReconstructionFreq) valReconstructionFreq.textContent = reconstructionFreq;
+            if (barReconstruction) barReconstruction.style.width = reconstructionFill;
+
+            const profile = getGoalProfile(context.targetColor, context.baseColor);
+            let cautionText = profile.caution;
+            if (context.baseColor === 'preto' && 
+                ['loiro', 'platin', 'clarear'].some(kw => normalizeText(context.targetColor).includes(kw))) {
+                cautionText += ' Em base preta, a subida para loiro costuma exigir mais de uma etapa e muito controle de fundo para preservar integridade.';
+            }
+            if (valCaution) valCaution.textContent = cautionText;
+        } else {
+            if (cardSchedule) cardSchedule.classList.add('hidden');
+            if (cardCaution) cardCaution.classList.add('hidden');
+        }
+    }
+
+    function updateUI() {
+        updateStepper(context.step);
+        renderChips(context.step);
+        updateDashboard();
+    }
+
     function restartConversation() {
         context = createInitialContext();
         clearMessages();
         addMessage(initialPrompt, 'bot');
         userInput.value = '';
         userInput.focus();
+        updateUI();
     }
 
     function buildError(message, isConnectionError) {
@@ -936,6 +1167,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 restartConversation();
             } else {
                 userInput.focus();
+                updateUI();
             }
         } catch (error) {
             isServerOnline = false;
@@ -951,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 restartConversation();
             } else {
                 userInput.focus();
+                updateUI();
             }
         }
     }
@@ -999,6 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isRequestInFlight = false;
             retryBtn.disabled = false;
             setFormEnabled(true);
+            updateUI();
 
             if (interactionMode !== 'connecting') {
                 userInput.focus();
@@ -1032,6 +1266,22 @@ document.addEventListener('DOMContentLoaded', () => {
             handleSend();
         }
     });
+
+    if (tabChatBtn && tabProtocolBtn) {
+        tabChatBtn.addEventListener('click', () => {
+            tabChatBtn.classList.add('active');
+            tabProtocolBtn.classList.remove('active');
+            chatColumn.classList.remove('hidden-tab');
+            protocolColumn.classList.remove('active-tab');
+        });
+
+        tabProtocolBtn.addEventListener('click', () => {
+            tabProtocolBtn.classList.add('active');
+            tabChatBtn.classList.remove('active');
+            chatColumn.classList.add('hidden-tab');
+            protocolColumn.classList.add('active-tab');
+        });
+    }
 
     bootstrap(true);
 });

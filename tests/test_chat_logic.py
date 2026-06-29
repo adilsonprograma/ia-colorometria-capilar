@@ -112,7 +112,7 @@ class ChatLogicTests(unittest.TestCase):
             result.response,
         )
         self.assertIn(
-            "Pela regra do projeto, OX = metade do total da coloracao: 60 / 2 = 30 g de oxidante.",
+            "Pela regra do projeto, OX = 1,5 vezes o total da coloracao (proporcao 1:1,5): 60 x 1.5 = 90 g de oxidante.",
             result.response,
         )
         self.assertIn(
